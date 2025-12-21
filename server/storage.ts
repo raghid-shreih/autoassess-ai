@@ -1,4 +1,6 @@
-import type { Claim, InsertClaim, DamageItem } from "@shared/schema";
+import { claims, type Claim, type InsertClaim, type DamageItem } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -9,59 +11,86 @@ export interface IStorage {
   updateDamageItem(claimId: string, damageId: string, updates: Partial<DamageItem>): Promise<DamageItem | null>;
 }
 
-export class MemStorage implements IStorage {
-  private claims: Map<string, Claim> = new Map();
-
+export class DatabaseStorage implements IStorage {
   async getAllClaims(): Promise<Claim[]> {
-    return Array.from(this.claims.values()).sort((a, b) => 
-      new Date(b.claimDate).getTime() - new Date(a.claimDate).getTime()
-    );
+    const rows = await db.select().from(claims).orderBy(desc(claims.claimDate));
+    return rows.map(row => ({
+      ...row,
+      imageUrl: row.imageUrl ?? undefined,
+      agentNotes: row.agentNotes ?? undefined,
+    })) as Claim[];
   }
 
   async getClaimById(id: string): Promise<Claim | null> {
-    return this.claims.get(id) || null;
+    const [row] = await db.select().from(claims).where(eq(claims.id, id));
+    if (!row) return null;
+    return {
+      ...row,
+      imageUrl: row.imageUrl ?? undefined,
+      agentNotes: row.agentNotes ?? undefined,
+    } as Claim;
   }
 
   async createClaim(insertClaim: InsertClaim): Promise<Claim> {
-    const claim: Claim = {
-      ...insertClaim,
-      id: randomUUID(),
+    const id = randomUUID();
+    const values = {
+      id,
+      policyNumber: insertClaim.policyNumber,
+      vehicleInfo: insertClaim.vehicleInfo,
+      claimDate: insertClaim.claimDate,
+      status: insertClaim.status ?? "pending",
+      imageUrl: insertClaim.imageUrl,
+      damages: insertClaim.damages ?? [],
+      overallConfidence: insertClaim.overallConfidence ?? 0,
+      totalEstimate: insertClaim.totalEstimate ?? 0,
+      agentNotes: insertClaim.agentNotes,
     };
-    this.claims.set(claim.id, claim);
-    return claim;
+    const [row] = await db
+      .insert(claims)
+      .values(values as typeof claims.$inferInsert)
+      .returning();
+    return {
+      ...row,
+      imageUrl: row.imageUrl ?? undefined,
+      agentNotes: row.agentNotes ?? undefined,
+    } as Claim;
   }
 
   async updateClaim(id: string, updates: Partial<Claim>): Promise<Claim | null> {
-    const claim = this.claims.get(id);
-    if (!claim) {
-      return null;
-    }
-    const updatedClaim = { ...claim, ...updates };
-    this.claims.set(id, updatedClaim);
-    return updatedClaim;
+    const [row] = await db
+      .update(claims)
+      .set(updates)
+      .where(eq(claims.id, id))
+      .returning();
+    if (!row) return null;
+    return {
+      ...row,
+      imageUrl: row.imageUrl ?? undefined,
+      agentNotes: row.agentNotes ?? undefined,
+    } as Claim;
   }
 
   async updateDamageItem(claimId: string, damageId: string, updates: Partial<DamageItem>): Promise<DamageItem | null> {
-    const claim = this.claims.get(claimId);
-    if (!claim) {
-      return null;
-    }
+    const claim = await this.getClaimById(claimId);
+    if (!claim) return null;
 
     const damageIndex = claim.damages.findIndex(d => d.id === damageId);
-    if (damageIndex === -1) {
-      return null;
-    }
+    if (damageIndex === -1) return null;
 
     const updatedDamage = { ...claim.damages[damageIndex], ...updates };
     claim.damages[damageIndex] = updatedDamage;
     
-    claim.totalEstimate = claim.damages.reduce(
+    const totalEstimate = claim.damages.reduce(
       (sum, d) => sum + d.laborCost + d.partsCost, 0
     );
 
-    this.claims.set(claimId, claim);
+    await db
+      .update(claims)
+      .set({ damages: claim.damages, totalEstimate })
+      .where(eq(claims.id, claimId));
+
     return updatedDamage;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
