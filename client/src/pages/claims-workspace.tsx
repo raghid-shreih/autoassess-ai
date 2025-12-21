@@ -95,7 +95,7 @@ function ClaimsList({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Claims History
+          Claims for Review
           <Badge variant="secondary">{claims.length}</Badge>
         </CardTitle>
       </CardHeader>
