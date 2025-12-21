@@ -1,37 +1,55 @@
-import { type User, type InsertUser } from "@shared/schema";
+import type { Claim, InsertClaim, DamageItem } from "@shared/schema";
 import { randomUUID } from "crypto";
 
-// modify the interface with any CRUD methods
-// you might need
-
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getCurrentClaim(): Promise<Claim | null>;
+  createClaim(claim: InsertClaim): Promise<Claim>;
+  updateClaim(id: string, updates: Partial<Claim>): Promise<Claim | null>;
+  updateDamageItem(claimId: string, damageId: string, updates: Partial<DamageItem>): Promise<DamageItem | null>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+  private currentClaim: Claim | null = null;
 
-  constructor() {
-    this.users = new Map();
+  async getCurrentClaim(): Promise<Claim | null> {
+    return this.currentClaim;
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async createClaim(insertClaim: InsertClaim): Promise<Claim> {
+    const claim: Claim = {
+      ...insertClaim,
+      id: randomUUID(),
+    };
+    this.currentClaim = claim;
+    return claim;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+  async updateClaim(id: string, updates: Partial<Claim>): Promise<Claim | null> {
+    if (!this.currentClaim || this.currentClaim.id !== id) {
+      return null;
+    }
+    this.currentClaim = { ...this.currentClaim, ...updates };
+    return this.currentClaim;
+  }
+
+  async updateDamageItem(claimId: string, damageId: string, updates: Partial<DamageItem>): Promise<DamageItem | null> {
+    if (!this.currentClaim || this.currentClaim.id !== claimId) {
+      return null;
+    }
+
+    const damageIndex = this.currentClaim.damages.findIndex(d => d.id === damageId);
+    if (damageIndex === -1) {
+      return null;
+    }
+
+    const updatedDamage = { ...this.currentClaim.damages[damageIndex], ...updates };
+    this.currentClaim.damages[damageIndex] = updatedDamage;
+    
+    this.currentClaim.totalEstimate = this.currentClaim.damages.reduce(
+      (sum, d) => sum + d.laborCost + d.partsCost, 0
     );
-  }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    return updatedDamage;
   }
 }
 
