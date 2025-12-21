@@ -7,65 +7,247 @@ import { ConfidenceDisplay } from "@/components/confidence-display";
 import { CostEstimate } from "@/components/cost-estimate";
 import { VehicleInfo } from "@/components/vehicle-info";
 import { ActionPanel } from "@/components/action-panel";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { ArrowLeft, Car, Clock, CheckCircle, AlertTriangle, FileText, Plus } from "lucide-react";
 import type { Claim, DamageItem } from "@shared/schema";
 
-function EmptyState() {
-  return (
-    <Card className="h-full min-h-96">
-      <CardContent className="h-full flex flex-col items-center justify-center p-8 text-center">
-        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <svg 
-            className="h-8 w-8 text-muted-foreground" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
-          >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={1.5} 
-              d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" 
-            />
-          </svg>
-        </div>
-        <h3 className="text-lg font-semibold mb-2">No Active Assessment</h3>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Upload an image of vehicle damage to begin the AI-powered assessment process.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
+function ClaimsList({ 
+  claims, 
+  isLoading, 
+  onSelectClaim 
+}: { 
+  claims: Claim[] | undefined; 
+  isLoading: boolean;
+  onSelectClaim: (claim: Claim) => void;
+}) {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "approved":
+        return { variant: "default" as const, icon: CheckCircle, className: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20" };
+      case "flagged":
+        return { variant: "default" as const, icon: AlertTriangle, className: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20" };
+      case "in_review":
+        return { variant: "default" as const, icon: Clock, className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20" };
+      default:
+        return { variant: "secondary" as const, icon: FileText, className: "" };
+    }
+  };
 
-function AssessmentSkeleton() {
-  return (
-    <div className="space-y-6">
+  if (isLoading) {
+    return (
       <Card>
-        <CardContent className="p-6">
-          <Skeleton className="h-6 w-40 mb-4" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Claims History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-5 w-32" />
-                  <Skeleton className="h-5 w-16 rounded-full" />
+              <div key={i} className="flex items-center justify-between p-4 border rounded-md">
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-12 w-12 rounded" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
                 </div>
-                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-6 w-20" />
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (!claims || claims.length === 0) {
+    return (
       <Card>
-        <CardContent className="p-6">
-          <Skeleton className="h-6 w-32 mb-4" />
-          <Skeleton className="h-16 w-24" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Claims History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
+              <FileText className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              No claims yet. Upload an image below to create your first claim.
+            </p>
+          </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          Claims History
+          <Badge variant="secondary">{claims.length}</Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {claims.map((claim) => {
+            const statusInfo = getStatusBadge(claim.status);
+            const StatusIcon = statusInfo.icon;
+            const claimDate = new Date(claim.claimDate);
+            
+            return (
+              <button
+                key={claim.id}
+                onClick={() => onSelectClaim(claim)}
+                className="w-full flex items-center justify-between gap-4 p-4 border rounded-md hover-elevate active-elevate-2 text-left transition-colors"
+                data-testid={`claim-row-${claim.id}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded bg-muted flex items-center justify-center shrink-0">
+                    <Car className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <div className="font-medium flex items-center gap-2 flex-wrap">
+                      <span>{claim.vehicleInfo.year} {claim.vehicleInfo.make} {claim.vehicleInfo.model}</span>
+                      <Badge className={statusInfo.className}>
+                        <StatusIcon className="h-3 w-3 mr-1" />
+                        {claim.status.replace("_", " ")}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap">
+                      <span>{claim.policyNumber}</span>
+                      <span>{claimDate.toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="font-semibold">${claim.totalEstimate.toLocaleString()}</div>
+                  <div className="text-sm text-muted-foreground">{claim.damages?.length || 0} items</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function NewClaimSection({
+  onImageUpload,
+  isProcessing,
+}: {
+  onImageUpload: (imageData: string) => void;
+  isProcessing: boolean;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Plus className="h-5 w-5" />
+          New Claim Assessment
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ImageUpload
+          onImageUpload={onImageUpload}
+          isProcessing={isProcessing}
+          currentImage={null}
+          onClear={() => {}}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function ClaimDetail({
+  claim,
+  onBack,
+  onUpdateDamage,
+  onApprove,
+  onFlag,
+  isProcessing,
+}: {
+  claim: Claim;
+  onBack: () => void;
+  onUpdateDamage: (id: string, updates: Partial<DamageItem>) => void;
+  onApprove: () => void;
+  onFlag: () => void;
+  isProcessing: boolean;
+}) {
+  const [agentNotes, setAgentNotes] = useState(claim.agentNotes || "");
+  const { toast } = useToast();
+
+  const handleSaveDraft = () => {
+    toast({
+      title: "Draft Saved",
+      description: "Your progress has been saved.",
+    });
+  };
+
+  const isCompleted = claim.status === "approved" || claim.status === "flagged";
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back">
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h2 className="text-xl font-semibold">
+            {claim.vehicleInfo.year} {claim.vehicleInfo.make} {claim.vehicleInfo.model}
+          </h2>
+          <p className="text-sm text-muted-foreground">{claim.policyNumber}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          {claim.imageUrl && (
+            <Card>
+              <CardContent className="p-4">
+                <img
+                  src={claim.imageUrl}
+                  alt="Vehicle damage"
+                  className="w-full h-auto rounded-md object-contain max-h-96"
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <VehicleInfo claim={claim} />
+          <ConfidenceDisplay confidence={claim.overallConfidence} />
+          <DamageAssessment 
+            damages={claim.damages || []}
+            onUpdateDamage={isCompleted ? undefined : onUpdateDamage}
+          />
+          <CostEstimate damages={claim.damages || []} />
+          {!isCompleted && (
+            <ActionPanel
+              onApprove={onApprove}
+              onFlag={onFlag}
+              onSaveDraft={handleSaveDraft}
+              isProcessing={isProcessing}
+              hasAssessment={true}
+              notes={agentNotes}
+              onNotesChange={setAgentNotes}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -73,11 +255,10 @@ function AssessmentSkeleton() {
 export default function ClaimsWorkspace() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [agentNotes, setAgentNotes] = useState("");
+  const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
 
-  const { data: currentClaim, isLoading: isLoadingClaim } = useQuery<Claim | null>({
-    queryKey: ["/api/claims/current"],
+  const { data: claims, isLoading: isLoadingClaims } = useQuery<Claim[]>({
+    queryKey: ["/api/claims"],
   });
 
   const assessMutation = useMutation({
@@ -86,7 +267,8 @@ export default function ClaimsWorkspace() {
       return await response.json() as Claim;
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(["/api/claims/current"], data);
+      queryClient.invalidateQueries({ queryKey: ["/api/claims"] });
+      setSelectedClaim(data);
       toast({
         title: "Assessment Complete",
         description: "AI damage assessment has been generated successfully.",
@@ -102,12 +284,12 @@ export default function ClaimsWorkspace() {
   });
 
   const updateDamageMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<DamageItem> }) => {
-      const response = await apiRequest("PATCH", `/api/claims/damage/${id}`, updates);
+    mutationFn: async ({ claimId, damageId, updates }: { claimId: string; damageId: string; updates: Partial<DamageItem> }) => {
+      const response = await apiRequest("PATCH", `/api/claims/${claimId}/damage/${damageId}`, updates);
       return await response.json() as DamageItem;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/claims/current"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claims"] });
       toast({
         title: "Estimate Updated",
         description: "Your changes have been saved.",
@@ -116,12 +298,13 @@ export default function ClaimsWorkspace() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/claims/approve", { notes: agentNotes });
+    mutationFn: async (claimId: string) => {
+      const response = await apiRequest("POST", `/api/claims/${claimId}/approve`, {});
       return await response.json() as Claim;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/claims/current"] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/claims"] });
+      setSelectedClaim(data);
       toast({
         title: "Claim Approved",
         description: "The estimate has been forwarded for final review.",
@@ -130,12 +313,13 @@ export default function ClaimsWorkspace() {
   });
 
   const flagMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/claims/flag", { notes: agentNotes });
+    mutationFn: async (claimId: string) => {
+      const response = await apiRequest("POST", `/api/claims/${claimId}/flag`, {});
       return await response.json() as Claim;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/claims/current"] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/claims"] });
+      setSelectedClaim(data);
       toast({
         title: "Claim Flagged",
         description: "The claim has been flagged for manual review.",
@@ -144,71 +328,42 @@ export default function ClaimsWorkspace() {
   });
 
   const handleImageUpload = (imageData: string) => {
-    setUploadedImage(imageData);
     assessMutation.mutate(imageData);
   };
 
-  const handleClearImage = () => {
-    setUploadedImage(null);
-    queryClient.setQueryData(["/api/claims/current"], null);
+  const handleUpdateDamage = (damageId: string, updates: Partial<DamageItem>) => {
+    if (selectedClaim) {
+      updateDamageMutation.mutate({ claimId: selectedClaim.id, damageId, updates });
+    }
   };
-
-  const handleUpdateDamage = (id: string, updates: Partial<DamageItem>) => {
-    updateDamageMutation.mutate({ id, updates });
-  };
-
-  const handleSaveDraft = () => {
-    toast({
-      title: "Draft Saved",
-      description: "Your progress has been saved.",
-    });
-  };
-
-  const isProcessing = assessMutation.isPending;
-  const hasAssessment = !!currentClaim && Array.isArray(currentClaim.damages) && currentClaim.damages.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
-      <ClaimHeader claim={currentClaim} />
+      <ClaimHeader claim={selectedClaim} />
       
-      <main className="container mx-auto px-4 py-6 max-w-7xl">
-        <div className="grid gap-6 lg:grid-cols-5">
-          <div className="lg:col-span-3">
-            <ImageUpload
+      <main className="container mx-auto px-4 py-6 max-w-5xl">
+        {selectedClaim ? (
+          <ClaimDetail
+            claim={selectedClaim}
+            onBack={() => setSelectedClaim(null)}
+            onUpdateDamage={handleUpdateDamage}
+            onApprove={() => approveMutation.mutate(selectedClaim.id)}
+            onFlag={() => flagMutation.mutate(selectedClaim.id)}
+            isProcessing={approveMutation.isPending || flagMutation.isPending}
+          />
+        ) : (
+          <div className="space-y-6">
+            <ClaimsList
+              claims={claims}
+              isLoading={isLoadingClaims}
+              onSelectClaim={setSelectedClaim}
+            />
+            <NewClaimSection
               onImageUpload={handleImageUpload}
-              isProcessing={isProcessing}
-              currentImage={uploadedImage}
-              onClear={handleClearImage}
+              isProcessing={assessMutation.isPending}
             />
           </div>
-
-          <div className="lg:col-span-2 space-y-6">
-            {isLoadingClaim || isProcessing ? (
-              <AssessmentSkeleton />
-            ) : hasAssessment && currentClaim ? (
-              <>
-                <VehicleInfo claim={currentClaim} />
-                <ConfidenceDisplay confidence={currentClaim.overallConfidence} />
-                <DamageAssessment 
-                  damages={currentClaim.damages}
-                  onUpdateDamage={handleUpdateDamage}
-                />
-                <CostEstimate damages={currentClaim.damages} />
-                <ActionPanel
-                  onApprove={() => approveMutation.mutate()}
-                  onFlag={() => flagMutation.mutate()}
-                  onSaveDraft={handleSaveDraft}
-                  isProcessing={approveMutation.isPending || flagMutation.isPending}
-                  hasAssessment={hasAssessment}
-                  notes={agentNotes}
-                  onNotesChange={setAgentNotes}
-                />
-              </>
-            ) : (
-              <EmptyState />
-            )}
-          </div>
-        </div>
+        )}
       </main>
     </div>
   );

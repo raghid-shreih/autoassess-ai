@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 interface DamageAssessmentProps {
   damages: DamageItem[];
-  onUpdateDamage: (id: string, updates: Partial<DamageItem>) => void;
+  onUpdateDamage?: (id: string, updates: Partial<DamageItem>) => void;
 }
 
 const severityColors: Record<SeverityLevel, string> = {
@@ -25,9 +25,10 @@ function DamageItemRow({
   onUpdate 
 }: { 
   item: DamageItem; 
-  onUpdate: (updates: Partial<DamageItem>) => void;
+  onUpdate?: (updates: Partial<DamageItem>) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const canEdit = !!onUpdate;
   const [isExpanded, setIsExpanded] = useState(false);
   const [editValues, setEditValues] = useState({
     laborCost: item.laborCost,
@@ -40,7 +41,7 @@ function DamageItemRow({
   const totalCost = item.laborCost + item.partsCost;
 
   const handleSave = () => {
-    onUpdate(editValues);
+    onUpdate?.(editValues);
     setIsEditing(false);
   };
 
@@ -66,14 +67,14 @@ function DamageItemRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium" data-testid={`text-part-name-${item.id}`}>{item.part}</span>
-            <Badge variant="outline" size="sm" className="capitalize">
+            <Badge variant="outline" className="capitalize">
               {item.damageType}
             </Badge>
-            <Badge size="sm" className={severityColors[item.severity]}>
+            <Badge className={severityColors[item.severity]}>
               {item.severity}
             </Badge>
             {isLowConfidence && (
-              <Badge variant="secondary" size="sm" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
                 <AlertTriangle className="h-3 w-3 mr-1" />
                 {item.confidence}% confidence
               </Badge>
@@ -98,14 +99,16 @@ function DamageItemRow({
                   Parts: ${item.partsCost.toLocaleString()} | Labor: ${item.laborCost.toLocaleString()}
                 </div>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={() => setIsEditing(true)}
-                data-testid={`button-edit-${item.id}`}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
+              {canEdit && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setIsEditing(true)}
+                  data-testid={`button-edit-${item.id}`}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
             </>
           ) : (
             <div className="flex gap-2">
@@ -220,7 +223,7 @@ export function DamageAssessment({ damages, onUpdateDamage }: DamageAssessmentPr
             <DamageItemRow 
               key={item.id} 
               item={item} 
-              onUpdate={(updates) => onUpdateDamage(item.id, updates)}
+              onUpdate={onUpdateDamage ? (updates) => onUpdateDamage(item.id, updates) : undefined}
             />
           ))}
         </div>
