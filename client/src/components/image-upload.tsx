@@ -35,11 +35,11 @@ export function ImageUpload({
       setAnalyzingProgress(0);
       analyzingIntervalRef.current = setInterval(() => {
         setAnalyzingProgress(prev => {
-          const increment = Math.random() * 8 + 2;
+          const increment = Math.random() * 15 + 10;
           const newProgress = prev + increment;
           return Math.min(newProgress, 95); // Cap at 95% until complete
         });
-      }, 100);
+      }, 50);
     } else {
       if (analyzingIntervalRef.current) {
         clearInterval(analyzingIntervalRef.current);
@@ -107,7 +107,7 @@ export function ImageUpload({
       // Simulate upload progress since we're using base64
       let progress = 0;
       const progressInterval = setInterval(() => {
-        progress += Math.random() * 20 + 5;
+        progress += Math.random() * 30 + 15;
         if (progress >= 100) {
           progress = 100;
           clearInterval(progressInterval);
@@ -117,7 +117,7 @@ export function ImageUpload({
         } else {
           setUploadProgress(Math.min(progress, 100));
         }
-      }, 80);
+      }, 40);
     };
     
     reader.readAsDataURL(file);
