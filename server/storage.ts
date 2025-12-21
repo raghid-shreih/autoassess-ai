@@ -57,9 +57,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateClaim(id: string, updates: Partial<Claim>): Promise<Claim | null> {
+    // Map Claim fields to database column names, filtering out undefined values
+    const dbUpdates: Partial<typeof claims.$inferInsert> = {};
+    if (updates.policyNumber !== undefined) dbUpdates.policyNumber = updates.policyNumber;
+    if (updates.vehicleInfo !== undefined) dbUpdates.vehicleInfo = updates.vehicleInfo;
+    if (updates.claimDate !== undefined) dbUpdates.claimDate = updates.claimDate;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.imageUrl !== undefined) dbUpdates.imageUrl = updates.imageUrl;
+    if (updates.damages !== undefined) dbUpdates.damages = updates.damages;
+    if (updates.overallConfidence !== undefined) dbUpdates.overallConfidence = updates.overallConfidence;
+    if (updates.totalEstimate !== undefined) dbUpdates.totalEstimate = updates.totalEstimate;
+    if (updates.agentNotes !== undefined) dbUpdates.agentNotes = updates.agentNotes;
+
     const [row] = await db
       .update(claims)
-      .set(updates)
+      .set(dbUpdates)
       .where(eq(claims.id, id))
       .returning();
     if (!row) return null;
