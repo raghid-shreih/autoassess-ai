@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 const app = express();
 const httpServer = createServer(app);
@@ -60,7 +62,31 @@ app.use((req, res, next) => {
   next();
 });
 
+async function initializeDatabase() {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS claims (
+        id TEXT PRIMARY KEY,
+        policy_number TEXT NOT NULL,
+        vehicle_info JSONB NOT NULL,
+        claim_date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        image_url TEXT,
+        damages JSONB NOT NULL DEFAULT '[]'::jsonb,
+        overall_confidence REAL NOT NULL DEFAULT 0,
+        total_estimate REAL NOT NULL DEFAULT 0,
+        agent_notes TEXT
+      )
+    `);
+    log("Database initialized successfully");
+  } catch (error) {
+    log(`Database initialization error: ${error}`);
+    throw error;
+  }
+}
+
 (async () => {
+  await initializeDatabase();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
