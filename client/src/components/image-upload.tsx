@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { Upload, Image as ImageIcon, X, Loader2 } from "lucide-react";
+import { useCallback, useState, useEffect, useRef } from "react";
+import { Upload, Image as ImageIcon, X, Loader2, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -25,9 +25,39 @@ export function ImageUpload({
 }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStage, setUploadStage] = useState<"idle" | "reading" | "uploading" | "analyzing">("idle");
+  const [uploadStage, setUploadStage] = useState<"idle" | "reading" | "uploading">("idle");
+  const [analyzingProgress, setAnalyzingProgress] = useState(0);
+  const analyzingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isUploading = uploadStage !== "idle" || isProcessing;
+  // Track analyzing progress when isProcessing is true
+  useEffect(() => {
+    if (isProcessing) {
+      setAnalyzingProgress(0);
+      analyzingIntervalRef.current = setInterval(() => {
+        setAnalyzingProgress(prev => {
+          const increment = Math.random() * 8 + 2;
+          const newProgress = prev + increment;
+          return Math.min(newProgress, 95); // Cap at 95% until complete
+        });
+      }, 100);
+    } else {
+      if (analyzingIntervalRef.current) {
+        clearInterval(analyzingIntervalRef.current);
+        analyzingIntervalRef.current = null;
+      }
+      // Briefly show 100% before closing
+      if (analyzingProgress > 0) {
+        setAnalyzingProgress(100);
+        setTimeout(() => setAnalyzingProgress(0), 300);
+      }
+    }
+    
+    return () => {
+      if (analyzingIntervalRef.current) {
+        clearInterval(analyzingIntervalRef.current);
+      }
+    };
+  }, [isProcessing]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -77,20 +107,17 @@ export function ImageUpload({
       // Simulate upload progress since we're using base64
       let progress = 0;
       const progressInterval = setInterval(() => {
-        progress += Math.random() * 15;
+        progress += Math.random() * 20 + 5;
         if (progress >= 100) {
           progress = 100;
           clearInterval(progressInterval);
-          setUploadStage("analyzing");
+          setUploadStage("idle");
+          setUploadProgress(0);
           onImageUpload(result);
-          // Reset after a short delay to let isProcessing take over
-          setTimeout(() => {
-            setUploadStage("idle");
-            setUploadProgress(0);
-          }, 500);
+        } else {
+          setUploadProgress(Math.min(progress, 100));
         }
-        setUploadProgress(Math.min(progress, 100));
-      }, 150);
+      }, 80);
     };
     
     reader.readAsDataURL(file);
@@ -136,8 +163,6 @@ export function ImageUpload({
         return "Reading file...";
       case "uploading":
         return "Uploading image...";
-      case "analyzing":
-        return "Starting analysis...";
       default:
         return "";
     }
@@ -205,6 +230,26 @@ export function ImageUpload({
             <Progress value={uploadProgress} className="h-2" data-testid="progress-upload" />
             <p className="text-xs text-muted-foreground text-right">
               {Math.round(uploadProgress)}%
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isProcessing}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-analyzing-progress">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 animate-pulse text-primary" />
+              Analyzing Damage
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              AI is detecting and assessing vehicle damage...
+            </p>
+            <Progress value={analyzingProgress} className="h-2" data-testid="progress-analyzing" />
+            <p className="text-xs text-muted-foreground text-right">
+              {Math.round(analyzingProgress)}%
             </p>
           </div>
         </DialogContent>

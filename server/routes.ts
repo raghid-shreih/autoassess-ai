@@ -172,7 +172,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Image data is required" });
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       const { damages, confidence } = generateSimulatedDamageAssessment();
       const vehicleInfo = generateMockVehicleInfo();
