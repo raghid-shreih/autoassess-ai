@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
+import { execSync } from "child_process";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -59,6 +60,9 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  console.log("pushing database schema...");
+  execSync("npm run db:push", { stdio: "inherit" });
 }
 
 buildAll().catch((err) => {
