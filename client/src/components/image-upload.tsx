@@ -1,20 +1,57 @@
-import { useCallback, useState, useEffect, useRef } from "react";
-import { Upload, Image as ImageIcon, X, Loader2, Brain } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Upload, Image as ImageIcon, X, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
 
 interface ImageUploadProps {
   onImageUpload: (imageData: string) => void;
   isProcessing?: boolean;
   currentImage?: string | null;
   onClear?: () => void;
+}
+
+// Compress image to target size and max dimension
+async function compressImage(file: File, maxDimension = 1280, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    img.onload = () => {
+      let { width, height } = img;
+      
+      // Scale down if larger than maxDimension
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      ctx?.drawImage(img, 0, 0, width, height);
+      
+      // Convert to compressed JPEG
+      const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+      resolve(compressedDataUrl);
+    };
+
+    img.onerror = () => reject(new Error("Failed to load image"));
+
+    // Create object URL from file
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 export function ImageUpload({ 
@@ -24,40 +61,7 @@ export function ImageUpload({
   onClear 
 }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStage, setUploadStage] = useState<"idle" | "reading" | "uploading">("idle");
-  const [analyzingProgress, setAnalyzingProgress] = useState(0);
-  const analyzingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Track analyzing progress when isProcessing is true
-  useEffect(() => {
-    if (isProcessing) {
-      setAnalyzingProgress(0);
-      analyzingIntervalRef.current = setInterval(() => {
-        setAnalyzingProgress(prev => {
-          const increment = Math.random() * 15 + 10;
-          const newProgress = prev + increment;
-          return Math.min(newProgress, 95); // Cap at 95% until complete
-        });
-      }, 50);
-    } else {
-      if (analyzingIntervalRef.current) {
-        clearInterval(analyzingIntervalRef.current);
-        analyzingIntervalRef.current = null;
-      }
-      // Briefly show 100% before closing
-      if (analyzingProgress > 0) {
-        setAnalyzingProgress(100);
-        setTimeout(() => setAnalyzingProgress(0), 300);
-      }
-    }
-    
-    return () => {
-      if (analyzingIntervalRef.current) {
-        clearInterval(analyzingIntervalRef.current);
-      }
-    };
-  }, [isProcessing]);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -86,41 +90,24 @@ export function ImageUpload({
     }
   }, []);
 
-  const processFile = (file: File) => {
-    setUploadStage("reading");
-    setUploadProgress(0);
-    
-    const reader = new FileReader();
-    
-    reader.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const progress = Math.round((e.loaded / e.total) * 100);
-        setUploadProgress(progress);
-      }
-    };
-    
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setUploadStage("uploading");
-      setUploadProgress(0);
-      
-      // Simulate upload progress since we're using base64
-      let progress = 0;
-      const progressInterval = setInterval(() => {
-        progress += Math.random() * 30 + 15;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(progressInterval);
-          setUploadStage("idle");
-          setUploadProgress(0);
-          onImageUpload(result);
-        } else {
-          setUploadProgress(Math.min(progress, 100));
-        }
-      }, 40);
-    };
-    
-    reader.readAsDataURL(file);
+  const processFile = async (file: File) => {
+    setIsCompressing(true);
+    try {
+      // Compress image to reduce payload size (max 1280px, JPEG quality 0.7)
+      const compressedDataUrl = await compressImage(file, 1280, 0.7);
+      setIsCompressing(false);
+      onImageUpload(compressedDataUrl);
+    } catch (error) {
+      console.error("Image compression failed:", error);
+      setIsCompressing(false);
+      // Fallback to original file if compression fails
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        onImageUpload(result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   if (currentImage) {
@@ -156,17 +143,6 @@ export function ImageUpload({
       </div>
     );
   }
-
-  const getUploadMessage = () => {
-    switch (uploadStage) {
-      case "reading":
-        return "Reading file...";
-      case "uploading":
-        return "Uploading image...";
-      default:
-        return "";
-    }
-  };
 
   return (
     <>
@@ -217,40 +193,21 @@ export function ImageUpload({
         </p>
       </div>
 
-      <Dialog open={uploadStage !== "idle"}>
-        <DialogContent className="sm:max-w-md" data-testid="dialog-upload-progress">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Processing Upload
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">{getUploadMessage()}</p>
-            <Progress value={uploadProgress} className="h-2" data-testid="progress-upload" />
-            <p className="text-xs text-muted-foreground text-right">
-              {Math.round(uploadProgress)}%
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isProcessing}>
+      <Dialog open={isCompressing || isProcessing}>
         <DialogContent className="sm:max-w-md" data-testid="dialog-analyzing-progress">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5 animate-pulse text-primary" />
-              Analyzing Damage
+              {isCompressing ? "Preparing Image" : "Analyzing Damage"}
             </DialogTitle>
+            <DialogDescription>
+              {isCompressing 
+                ? "Optimizing image for upload..." 
+                : "AI is detecting and assessing vehicle damage..."}
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
-              AI is detecting and assessing vehicle damage...
-            </p>
-            <Progress value={analyzingProgress} className="h-2" data-testid="progress-analyzing" />
-            <p className="text-xs text-muted-foreground text-right">
-              {Math.round(analyzingProgress)}%
-            </p>
+          <div className="flex items-center justify-center py-6">
+            <div className="h-10 w-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
           </div>
         </DialogContent>
       </Dialog>
