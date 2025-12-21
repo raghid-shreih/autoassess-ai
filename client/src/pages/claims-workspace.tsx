@@ -255,10 +255,16 @@ function ClaimDetail({
 export default function ClaimsWorkspace() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
 
   const { data: claims, isLoading: isLoadingClaims } = useQuery<Claim[]>({
     queryKey: ["/api/claims"],
+  });
+
+  // Fetch full claim data (including image) when a claim is selected
+  const { data: selectedClaim, isLoading: isLoadingSelectedClaim } = useQuery<Claim>({
+    queryKey: ["/api/claims", selectedClaimId],
+    enabled: !!selectedClaimId,
   });
 
   const assessMutation = useMutation({
@@ -268,7 +274,7 @@ export default function ClaimsWorkspace() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/claims"] });
-      setSelectedClaim(data);
+      setSelectedClaimId(data.id);
       toast({
         title: "Assessment Complete",
         description: "AI damage assessment has been generated successfully.",
@@ -304,7 +310,7 @@ export default function ClaimsWorkspace() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/claims"] });
-      setSelectedClaim(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/claims", selectedClaimId] });
       toast({
         title: "Claim Approved",
         description: "The estimate has been forwarded for final review.",
@@ -319,7 +325,7 @@ export default function ClaimsWorkspace() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/claims"] });
-      setSelectedClaim(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/claims", selectedClaimId] });
       toast({
         title: "Claim Flagged",
         description: "The claim has been flagged for manual review.",
@@ -342,21 +348,30 @@ export default function ClaimsWorkspace() {
       <ClaimHeader claim={selectedClaim} />
       
       <main className="container mx-auto px-4 py-6 max-w-5xl">
-        {selectedClaim ? (
-          <ClaimDetail
-            claim={selectedClaim}
-            onBack={() => setSelectedClaim(null)}
-            onUpdateDamage={handleUpdateDamage}
-            onApprove={() => approveMutation.mutate(selectedClaim.id)}
-            onFlag={() => flagMutation.mutate(selectedClaim.id)}
-            isProcessing={approveMutation.isPending || flagMutation.isPending}
-          />
+        {selectedClaimId ? (
+          isLoadingSelectedClaim || !selectedClaim ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                <span className="text-sm text-muted-foreground">Loading claim details...</span>
+              </div>
+            </div>
+          ) : (
+            <ClaimDetail
+              claim={selectedClaim}
+              onBack={() => setSelectedClaimId(null)}
+              onUpdateDamage={handleUpdateDamage}
+              onApprove={() => approveMutation.mutate(selectedClaim.id)}
+              onFlag={() => flagMutation.mutate(selectedClaim.id)}
+              isProcessing={approveMutation.isPending || flagMutation.isPending}
+            />
+          )
         ) : (
           <div className="space-y-6">
             <ClaimsList
               claims={claims}
               isLoading={isLoadingClaims}
-              onSelectClaim={setSelectedClaim}
+              onSelectClaim={(claim) => setSelectedClaimId(claim.id)}
             />
             <NewClaimSection
               onImageUpload={handleImageUpload}
