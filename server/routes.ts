@@ -142,12 +142,25 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  app.get("/api/claims/current", async (req, res) => {
+  app.get("/api/claims", async (req, res) => {
     try {
-      const claim = await storage.getCurrentClaim();
+      const claims = await storage.getAllClaims();
+      res.json(claims);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch claims" });
+    }
+  });
+
+  app.get("/api/claims/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const claim = await storage.getClaimById(id);
+      if (!claim) {
+        return res.status(404).json({ error: "Claim not found" });
+      }
       res.json(claim);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch current claim" });
+      res.status(500).json({ error: "Failed to fetch claim" });
     }
   });
 
@@ -169,7 +182,7 @@ export async function registerRoutes(
         policyNumber: `POL-${Math.floor(100000 + Math.random() * 900000)}`,
         vehicleInfo,
         claimDate: new Date().toISOString(),
-        status: confidence < 85 ? "flagged" : "in_review",
+        status: "in_review",
         imageUrl: imageData,
         damages,
         overallConfidence: confidence,
@@ -183,17 +196,12 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/claims/damage/:damageId", async (req, res) => {
+  app.patch("/api/claims/:claimId/damage/:damageId", async (req, res) => {
     try {
-      const { damageId } = req.params;
+      const { claimId, damageId } = req.params;
       const updates = req.body;
 
-      const currentClaim = await storage.getCurrentClaim();
-      if (!currentClaim) {
-        return res.status(404).json({ error: "No active claim found" });
-      }
-
-      const updatedDamage = await storage.updateDamageItem(currentClaim.id, damageId, updates);
+      const updatedDamage = await storage.updateDamageItem(claimId, damageId, updates);
 
       if (!updatedDamage) {
         return res.status(404).json({ error: "Damage item not found" });
@@ -205,19 +213,19 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/claims/approve", async (req, res) => {
+  app.post("/api/claims/:id/approve", async (req, res) => {
     try {
+      const { id } = req.params;
       const { notes } = req.body;
-      const currentClaim = await storage.getCurrentClaim();
 
-      if (!currentClaim) {
-        return res.status(404).json({ error: "No active claim found" });
-      }
-
-      const updatedClaim = await storage.updateClaim(currentClaim.id, {
+      const updatedClaim = await storage.updateClaim(id, {
         status: "approved",
         agentNotes: notes,
       });
+
+      if (!updatedClaim) {
+        return res.status(404).json({ error: "Claim not found" });
+      }
 
       res.json(updatedClaim);
     } catch (error) {
@@ -225,19 +233,19 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/claims/flag", async (req, res) => {
+  app.post("/api/claims/:id/flag", async (req, res) => {
     try {
+      const { id } = req.params;
       const { notes } = req.body;
-      const currentClaim = await storage.getCurrentClaim();
 
-      if (!currentClaim) {
-        return res.status(404).json({ error: "No active claim found" });
-      }
-
-      const updatedClaim = await storage.updateClaim(currentClaim.id, {
+      const updatedClaim = await storage.updateClaim(id, {
         status: "flagged",
         agentNotes: notes,
       });
+
+      if (!updatedClaim) {
+        return res.status(404).json({ error: "Claim not found" });
+      }
 
       res.json(updatedClaim);
     } catch (error) {

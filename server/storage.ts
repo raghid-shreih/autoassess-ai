@@ -2,17 +2,24 @@ import type { Claim, InsertClaim, DamageItem } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
-  getCurrentClaim(): Promise<Claim | null>;
+  getAllClaims(): Promise<Claim[]>;
+  getClaimById(id: string): Promise<Claim | null>;
   createClaim(claim: InsertClaim): Promise<Claim>;
   updateClaim(id: string, updates: Partial<Claim>): Promise<Claim | null>;
   updateDamageItem(claimId: string, damageId: string, updates: Partial<DamageItem>): Promise<DamageItem | null>;
 }
 
 export class MemStorage implements IStorage {
-  private currentClaim: Claim | null = null;
+  private claims: Map<string, Claim> = new Map();
 
-  async getCurrentClaim(): Promise<Claim | null> {
-    return this.currentClaim;
+  async getAllClaims(): Promise<Claim[]> {
+    return Array.from(this.claims.values()).sort((a, b) => 
+      new Date(b.claimDate).getTime() - new Date(a.claimDate).getTime()
+    );
+  }
+
+  async getClaimById(id: string): Promise<Claim | null> {
+    return this.claims.get(id) || null;
   }
 
   async createClaim(insertClaim: InsertClaim): Promise<Claim> {
@@ -20,35 +27,39 @@ export class MemStorage implements IStorage {
       ...insertClaim,
       id: randomUUID(),
     };
-    this.currentClaim = claim;
+    this.claims.set(claim.id, claim);
     return claim;
   }
 
   async updateClaim(id: string, updates: Partial<Claim>): Promise<Claim | null> {
-    if (!this.currentClaim || this.currentClaim.id !== id) {
+    const claim = this.claims.get(id);
+    if (!claim) {
       return null;
     }
-    this.currentClaim = { ...this.currentClaim, ...updates };
-    return this.currentClaim;
+    const updatedClaim = { ...claim, ...updates };
+    this.claims.set(id, updatedClaim);
+    return updatedClaim;
   }
 
   async updateDamageItem(claimId: string, damageId: string, updates: Partial<DamageItem>): Promise<DamageItem | null> {
-    if (!this.currentClaim || this.currentClaim.id !== claimId) {
+    const claim = this.claims.get(claimId);
+    if (!claim) {
       return null;
     }
 
-    const damageIndex = this.currentClaim.damages.findIndex(d => d.id === damageId);
+    const damageIndex = claim.damages.findIndex(d => d.id === damageId);
     if (damageIndex === -1) {
       return null;
     }
 
-    const updatedDamage = { ...this.currentClaim.damages[damageIndex], ...updates };
-    this.currentClaim.damages[damageIndex] = updatedDamage;
+    const updatedDamage = { ...claim.damages[damageIndex], ...updates };
+    claim.damages[damageIndex] = updatedDamage;
     
-    this.currentClaim.totalEstimate = this.currentClaim.damages.reduce(
+    claim.totalEstimate = claim.damages.reduce(
       (sum, d) => sum + d.laborCost + d.partsCost, 0
     );
 
+    this.claims.set(claimId, claim);
     return updatedDamage;
   }
 }
