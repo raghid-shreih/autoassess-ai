@@ -145,9 +145,8 @@ export async function registerRoutes(
   app.get("/api/claims", async (req, res) => {
     try {
       const claims = await storage.getAllClaims();
-      // Exclude imageUrl from list response to improve performance
-      const claimsWithoutImages = claims.map(({ imageUrl, ...rest }) => rest);
-      res.json(claimsWithoutImages);
+      // Include imageUrl for thumbnails in list view
+      res.json(claims);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch claims" });
     }

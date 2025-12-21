@@ -21,9 +21,9 @@ function ClaimsList({
   isLoading, 
   onSelectClaim 
 }: { 
-  claims: ClaimSummary[] | undefined; 
+  claims: Claim[] | undefined; 
   isLoading: boolean;
-  onSelectClaim: (claim: ClaimSummary) => void;
+  onSelectClaim: (claim: Claim) => void;
 }) {
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -44,7 +44,7 @@ function ClaimsList({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Claims History
+            Claims for Review
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -73,7 +73,7 @@ function ClaimsList({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Claims History
+            Claims for Review
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -114,8 +114,16 @@ function ClaimsList({
                 data-testid={`claim-row-${claim.id}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded bg-muted flex items-center justify-center shrink-0">
-                    <Car className="h-6 w-6 text-muted-foreground" />
+                  <div className="h-12 w-12 rounded bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                    {claim.imageUrl ? (
+                      <img 
+                        src={claim.imageUrl} 
+                        alt="Damage photo" 
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Car className="h-6 w-6 text-muted-foreground" />
+                    )}
                   </div>
                   <div>
                     <div className="font-medium flex items-center gap-2 flex-wrap">
@@ -257,7 +265,7 @@ export default function ClaimsWorkspace() {
   const queryClient = useQueryClient();
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
 
-  const { data: claims, isLoading: isLoadingClaims } = useQuery<ClaimSummary[]>({
+  const { data: claims, isLoading: isLoadingClaims } = useQuery<Claim[]>({
     queryKey: ["/api/claims"],
   });
 
