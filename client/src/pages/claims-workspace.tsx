@@ -14,16 +14,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Car, Clock, CheckCircle, AlertTriangle, FileText, Plus } from "lucide-react";
-import type { Claim, DamageItem } from "@shared/schema";
+import type { Claim, ClaimSummary, DamageItem } from "@shared/schema";
 
 function ClaimsList({ 
   claims, 
   isLoading, 
   onSelectClaim 
 }: { 
-  claims: Claim[] | undefined; 
+  claims: ClaimSummary[] | undefined; 
   isLoading: boolean;
-  onSelectClaim: (claim: Claim) => void;
+  onSelectClaim: (claim: ClaimSummary) => void;
 }) {
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -257,7 +257,7 @@ export default function ClaimsWorkspace() {
   const queryClient = useQueryClient();
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
 
-  const { data: claims, isLoading: isLoadingClaims } = useQuery<Claim[]>({
+  const { data: claims, isLoading: isLoadingClaims } = useQuery<ClaimSummary[]>({
     queryKey: ["/api/claims"],
   });
 
@@ -296,6 +296,7 @@ export default function ClaimsWorkspace() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/claims"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/claims", selectedClaimId] });
       toast({
         title: "Estimate Updated",
         description: "Your changes have been saved.",

@@ -44,6 +44,9 @@ export const claimSchema = z.object({
 
 export type Claim = z.infer<typeof claimSchema>;
 
+// List view returns claims without the imageUrl for performance
+export type ClaimSummary = Omit<Claim, 'imageUrl'>;
+
 export const insertClaimSchema = claimSchema.omit({ id: true });
 export type InsertClaim = z.infer<typeof insertClaimSchema>;
 
