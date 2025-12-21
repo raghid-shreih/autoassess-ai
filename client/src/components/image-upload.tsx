@@ -23,8 +23,12 @@ async function compressImage(file: File, maxDimension = 1280, quality = 0.7): Pr
     const img = new Image();
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
+    const objectUrl = URL.createObjectURL(file);
 
     img.onload = () => {
+      // Revoke object URL to free memory
+      URL.revokeObjectURL(objectUrl);
+      
       let { width, height } = img;
       
       // Scale down if larger than maxDimension
@@ -47,10 +51,12 @@ async function compressImage(file: File, maxDimension = 1280, quality = 0.7): Pr
       resolve(compressedDataUrl);
     };
 
-    img.onerror = () => reject(new Error("Failed to load image"));
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to load image"));
+    };
 
-    // Create object URL from file
-    img.src = URL.createObjectURL(file);
+    img.src = objectUrl;
   });
 }
 
