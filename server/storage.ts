@@ -17,7 +17,7 @@ function generateMockClaims(): Claim[] {
       vehicleInfo: { make: "Toyota", model: "Camry", year: 2022, color: "Silver", vin: "1HGBH41JXMN109186" },
       claimDate: "2024-12-20",
       status: "pending",
-      imageUrl: "/images/damaged_silver_toyota_camry.png",
+      imageUrl: "/images/damaged_silver_toyota_camry.jpg",
       damages: [
         { id: randomUUID(), part: "Front Bumper", damageType: "dent", severity: "moderate", action: "repair", confidence: 92, laborCost: 180, partsCost: 120, reasoning: "Impact damage from minor collision" },
         { id: randomUUID(), part: "Headlight Assembly", damageType: "crack", severity: "severe", action: "replace", confidence: 98, laborCost: 75, partsCost: 340, reasoning: "Cracked lens requiring full replacement" }
@@ -32,7 +32,7 @@ function generateMockClaims(): Claim[] {
       vehicleInfo: { make: "Honda", model: "Accord", year: 2021, color: "Blue", vin: "2HGFC2F59MH512345" },
       claimDate: "2024-12-19",
       status: "in_review",
-      imageUrl: "/images/damaged_blue_honda_accord.png",
+      imageUrl: "/images/damaged_blue_honda_accord.jpg",
       damages: [
         { id: randomUUID(), part: "Rear Quarter Panel", damageType: "scratch", severity: "minor", action: "paint", confidence: 88, laborCost: 220, partsCost: 85, reasoning: "Surface scratches from parking incident" },
         { id: randomUUID(), part: "Tail Light", damageType: "crack", severity: "moderate", action: "replace", confidence: 94, laborCost: 60, partsCost: 195, reasoning: "Cracked housing from impact" }
@@ -47,7 +47,7 @@ function generateMockClaims(): Claim[] {
       vehicleInfo: { make: "Ford", model: "F-150", year: 2023, color: "Black", vin: "1FTFW1E50MFA12345" },
       claimDate: "2024-12-18",
       status: "approved",
-      imageUrl: "/images/hail_damaged_black_ford_f-150.png",
+      imageUrl: "/images/hail_damaged_black_ford_f-150.jpg",
       damages: [
         { id: randomUUID(), part: "Hood", damageType: "dent", severity: "moderate", action: "repair", confidence: 90, laborCost: 350, partsCost: 0, reasoning: "Hail damage with multiple small dents" },
         { id: randomUUID(), part: "Roof Panel", damageType: "dent", severity: "minor", action: "buff", confidence: 85, laborCost: 180, partsCost: 0, reasoning: "Minor surface dents from hail" },
@@ -63,7 +63,7 @@ function generateMockClaims(): Claim[] {
       vehicleInfo: { make: "BMW", model: "X5", year: 2022, color: "White", vin: "5UXCR6C55M9C12345" },
       claimDate: "2024-12-17",
       status: "flagged",
-      imageUrl: "/images/damaged_white_bmw_x5_suv.png",
+      imageUrl: "/images/damaged_white_bmw_x5_suv.jpg",
       damages: [
         { id: randomUUID(), part: "Front Door (Driver)", damageType: "structural", severity: "severe", action: "replace", confidence: 72, laborCost: 520, partsCost: 1200, reasoning: "Structural damage detected - manual verification recommended" },
         { id: randomUUID(), part: "Side Mirror", damageType: "crack", severity: "moderate", action: "replace", confidence: 96, laborCost: 45, partsCost: 380, reasoning: "Housing shattered from impact" }
@@ -78,7 +78,7 @@ function generateMockClaims(): Claim[] {
       vehicleInfo: { make: "Chevrolet", model: "Malibu", year: 2020, color: "Red", vin: "1G1ZD5ST8LF123456" },
       claimDate: "2024-12-16",
       status: "pending",
-      imageUrl: "/images/scratched_red_chevrolet_malibu.png",
+      imageUrl: "/images/scratched_red_chevrolet_malibu.jpg",
       damages: [
         { id: randomUUID(), part: "Rear Bumper", damageType: "scratch", severity: "minor", action: "paint", confidence: 94, laborCost: 150, partsCost: 75, reasoning: "Light scratches from backing incident" }
       ],
@@ -92,7 +92,7 @@ function generateMockClaims(): Claim[] {
       vehicleInfo: { make: "Tesla", model: "Model 3", year: 2023, color: "Grey", vin: "5YJ3E1EA8MF123456" },
       claimDate: "2024-12-15",
       status: "in_review",
-      imageUrl: "/images/damaged_grey_tesla_model_3.png",
+      imageUrl: "/images/damaged_grey_tesla_model_3.jpg",
       damages: [
         { id: randomUUID(), part: "Front Fender (Right)", damageType: "dent", severity: "moderate", action: "repair", confidence: 89, laborCost: 280, partsCost: 0, reasoning: "Dent from side impact, paintless repair possible" },
         { id: randomUUID(), part: "Door Handle", damageType: "crack", severity: "minor", action: "replace", confidence: 97, laborCost: 35, partsCost: 210, reasoning: "Cracked handle mechanism" },
@@ -108,7 +108,7 @@ function generateMockClaims(): Claim[] {
       vehicleInfo: { make: "Nissan", model: "Altima", year: 2021, color: "Green", vin: "1N4BL4BV5MC123456" },
       claimDate: "2024-12-14",
       status: "approved",
-      imageUrl: "/images/damaged_green_nissan_altima.png",
+      imageUrl: "/images/damaged_green_nissan_altima.jpg",
       damages: [
         { id: randomUUID(), part: "Trunk Lid", damageType: "dent", severity: "minor", action: "repair", confidence: 93, laborCost: 200, partsCost: 0, reasoning: "Small dent from falling object" },
         { id: randomUUID(), part: "Rear Glass", damageType: "crack", severity: "severe", action: "replace", confidence: 99, laborCost: 90, partsCost: 320, reasoning: "Complete replacement needed due to crack pattern" }
