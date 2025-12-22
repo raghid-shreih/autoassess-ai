@@ -61,8 +61,8 @@ async function buildAll() {
     logLevel: "info",
   });
 
-  console.log("pushing database schema...");
-  execSync("npm run db:push", { stdio: "inherit" });
+  // Database schema is initialized at runtime in server/index.ts
+  // This ensures production database gets the schema when the server starts
 }
 
 buildAll().catch((err) => {
