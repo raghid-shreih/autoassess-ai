@@ -2,8 +2,15 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import path from "path";
 
 const app = express();
+
+// Serve generated images as static files
+const imagesPath = process.env.NODE_ENV === "production" 
+  ? path.join(__dirname, 'images')
+  : path.join(process.cwd(), 'attached_assets/generated_images');
+app.use('/images', express.static(imagesPath));
 const httpServer = createServer(app);
 
 declare module "http" {

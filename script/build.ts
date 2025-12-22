@@ -1,6 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, cp, mkdir } from "fs/promises";
 import path from "path";
 
 // server deps to bundle to reduce openat(2) syscalls
@@ -64,8 +64,10 @@ async function buildAll() {
     },
   });
 
-  // Database schema is initialized at runtime in server/index.ts
-  // This ensures production database gets the schema when the server starts
+  // Copy generated images to dist folder for production
+  console.log("copying images...");
+  await mkdir("dist/images", { recursive: true });
+  await cp("attached_assets/generated_images", "dist/images", { recursive: true });
 }
 
 buildAll().catch((err) => {
