@@ -16,8 +16,8 @@ AI-powered car insurance claims damage assessment tool that automates the review
 ### Backend (Express)
 - **Location**: `server/`
 - **API Routes**: `server/routes.ts`
-- **Storage**: PostgreSQL database with Drizzle ORM (`server/storage.ts`, `server/db.ts`)
-- **Database Schema**: Drizzle models in `shared/schema.ts`
+- **Storage**: In-memory storage with pre-seeded mock data (`server/storage.ts`)
+- **Note**: Database temporarily disabled for prototype; can be re-enabled by restoring DatabaseStorage class
 
 ### Shared Types
 - **Location**: `shared/schema.ts`
