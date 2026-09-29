@@ -232,10 +232,17 @@ function ClaimDetail({
         <div className="lg:col-span-2 space-y-6">
           <VehicleInfo claim={claim} />
           <ConfidenceDisplay confidence={claim.overallConfidence} />
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-3">
           <DamageAssessment
             damages={claim.damages || []}
             onUpdateDamage={isCompleted ? undefined : onUpdateDamage}
           />
+        </div>
+        <div className="lg:col-span-2 space-y-6">
           <CostEstimate damages={claim.damages || []} />
           {isCompleted && (
             <Card>

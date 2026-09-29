@@ -4,9 +4,29 @@ A full-stack prototype for vehicle-damage assessment and human-reviewed insuranc
 
 **This is a simulation:** damage items, vehicle attributes, costs, reasoning and confidence scores are generated independently of the uploaded image. No vision model runs, scores are not calibrated probabilities, and no reports or repair authorizations are sent externally.
 
+![Assessment workspace with editable repair costs, simulated confidence and review actions](docs/screenshots/assessment-editor.jpg)
+
+*Review damage items, adjust estimates and record a human decision in one workspace. All pictured claims and estimates are demonstration data.*
+
 ## Problem and approach
 
 Claims agents need to review damage, adjust repair estimates and decide when specialist review is appropriate. This prototype explores that workflow through seven seeded mock claims and new image uploads. A reviewer can edit severity, repair actions and costs, save notes, approve an estimate or flag it for manual review.
+
+## Product walkthrough
+
+1. **Choose a claim:** the dashboard lists vehicles, review status and estimated repair costs.
+2. **Review the assessment:** edit severity, repair actions and costs, then save draft notes. The workspace pictured above keeps assessment details beside the cost breakdown and review controls.
+3. **Record the decision:** approve or request manual review with notes. Completed claims show their saved notes and become read-only in this demo.
+
+### Claims dashboard
+
+![Claims dashboard with seven seeded demonstration claims and image upload](docs/screenshots/claims-dashboard.jpg)
+
+### Manual review with saved notes
+
+![Flagged claim showing saved reviewer notes and a read-only assessment](docs/screenshots/manual-review.jpg)
+
+The review example was completed through the app's request-review action; it does not send a report externally.
 
 ## Architecture
 
@@ -92,6 +112,7 @@ client/          React application
 server/          API, image processing and in-memory workflow
 shared/          Types, validation schemas and optional database definitions
 script/          Production build
+docs/            Product screenshots and capture notes
 attached_assets/ Demo JPEGs and original draft PRD
 tests/          API regression tests and image fixture
 .github/         CI configuration

@@ -53,7 +53,7 @@ export function ActionPanel({
             data-testid="textarea-agent-notes"
           />
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <div className="flex flex-col gap-2">
             <Button
               variant="outline"
               onClick={onSaveDraft}
