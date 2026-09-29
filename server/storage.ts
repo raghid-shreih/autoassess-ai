@@ -1,8 +1,13 @@
-import { type Claim, type InsertClaim, type DamageItem, type ClaimStatus } from "@shared/schema";
+import { type Claim, type InsertClaim, type DamageItem, type ClaimStatus, type ClaimSummary } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { MAX_CLAIMS } from "./uploads";
+
+export class WorkflowError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
 
 export interface IStorage {
-  getAllClaims(): Promise<Claim[]>;
+  getAllClaims(): Promise<ClaimSummary[]>;
   getClaimById(id: string): Promise<Claim | null>;
   createClaim(claim: InsertClaim): Promise<Claim>;
   updateClaim(id: string, updates: Partial<Claim>): Promise<Claim | null>;
@@ -131,10 +136,14 @@ export class MemStorage implements IStorage {
     mockClaims.forEach(claim => this.claims.set(claim.id, claim));
   }
 
-  async getAllClaims(): Promise<Claim[]> {
+  async getAllClaims(): Promise<ClaimSummary[]> {
     return Array.from(this.claims.values()).sort(
       (a, b) => new Date(b.claimDate).getTime() - new Date(a.claimDate).getTime()
-    );
+    ).map(({ id, policyNumber, vehicleInfo, claimDate, status, overallConfidence, totalEstimate, imageUrl, damages }) => ({
+      id, policyNumber, vehicleInfo, claimDate, status, overallConfidence, totalEstimate,
+      damageCount: damages.length,
+      imageUrl: imageUrl?.startsWith("/images/") ? imageUrl : undefined,
+    }));
   }
 
   async getClaimById(id: string): Promise<Claim | null> {
@@ -142,6 +151,7 @@ export class MemStorage implements IStorage {
   }
 
   async createClaim(insertClaim: InsertClaim): Promise<Claim> {
+    if (this.claims.size >= MAX_CLAIMS) throw new WorkflowError(429, "Demo claim limit reached. Restart the server to reset demo data.");
     const id = randomUUID();
     const claim: Claim = {
       id,
@@ -162,6 +172,9 @@ export class MemStorage implements IStorage {
   async updateClaim(id: string, updates: Partial<Claim>): Promise<Claim | null> {
     const claim = this.claims.get(id);
     if (!claim) return null;
+    if (claim.status === "approved" || claim.status === "flagged") {
+      throw new WorkflowError(409, "Completed claims cannot be changed.");
+    }
 
     const updatedClaim = { ...claim, ...updates };
     this.claims.set(id, updatedClaim);
@@ -171,6 +184,9 @@ export class MemStorage implements IStorage {
   async updateDamageItem(claimId: string, damageId: string, updates: Partial<DamageItem>): Promise<DamageItem | null> {
     const claim = this.claims.get(claimId);
     if (!claim) return null;
+    if (claim.status === "approved" || claim.status === "flagged") {
+      throw new WorkflowError(409, "Completed claims cannot be changed.");
+    }
 
     const damageIndex = claim.damages.findIndex(d => d.id === damageId);
     if (damageIndex === -1) return null;
@@ -187,5 +203,3 @@ export class MemStorage implements IStorage {
     return updatedDamage;
   }
 }
-
-export const storage = new MemStorage();

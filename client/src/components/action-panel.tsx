@@ -47,6 +47,7 @@ export function ActionPanel({
           <Textarea
             placeholder="Add notes about this assessment..."
             value={notes}
+            maxLength={5000}
             onChange={(e) => onNotesChange(e.target.value)}
             className="min-h-24 resize-none"
             data-testid="textarea-agent-notes"
@@ -88,15 +89,15 @@ export function ActionPanel({
           <DialogHeader>
             <DialogTitle>Approve Estimate</DialogTitle>
             <DialogDescription>
-              Are you sure you want to approve this damage assessment and repair estimate? 
-              This will forward the report to the senior claims adjuster for final review.
+              Are you sure you want to approve this damage assessment and repair estimate?
+              This marks the claim as approved in this demo; no report is sent externally.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowApproveDialog(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 onApprove();
                 setShowApproveDialog(false);
@@ -114,7 +115,7 @@ export function ActionPanel({
           <DialogHeader>
             <DialogTitle>Request Manual Review</DialogTitle>
             <DialogDescription>
-              This will flag the claim for detailed review by a senior claims adjuster. 
+              This marks the claim for manual review in this demo.
               Please ensure you have added relevant notes explaining the reason for the flag.
             </DialogDescription>
           </DialogHeader>
@@ -122,7 +123,7 @@ export function ActionPanel({
             <Button variant="outline" onClick={() => setShowFlagDialog(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               variant="secondary"
               onClick={() => {
                 onFlag();

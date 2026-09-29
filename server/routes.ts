@@ -1,13 +1,16 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import type { Claim, DamageItem, SeverityLevel, DamageType, RepairAction } from "@shared/schema";
+import type { Server } from "http";
+import { type IStorage, MemStorage, WorkflowError } from "./storage";
+import { assessmentRequestSchema, updateDamageItemSchema, claimNotesSchema } from "@shared/schema";
+import { normalizeImage } from "./uploads";
+import { rateLimit } from "express-rate-limit";
+import type { DamageItem, SeverityLevel, DamageType, RepairAction } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 function generateSimulatedDamageAssessment(): { damages: DamageItem[]; confidence: number } {
   const vehicleParts = [
     "Front Bumper",
-    "Rear Bumper", 
+    "Rear Bumper",
     "Driver Door",
     "Passenger Door",
     "Hood",
@@ -58,10 +61,10 @@ function generateSimulatedDamageAssessment(): { damages: DamageItem[]; confidenc
   const numDamages = 2 + Math.floor(Math.random() * 4);
   const selectedParts = shuffleArray([...vehicleParts]).slice(0, numDamages);
 
-  const damages: DamageItem[] = selectedParts.map((part, index) => {
+  const damages: DamageItem[] = selectedParts.map((part) => {
     const damageType = damageTypes[Math.floor(Math.random() * damageTypes.length)];
     const severity = severityLevels[Math.floor(Math.random() * severityLevels.length)];
-    
+
     let action: RepairAction;
     if (severity === "severe") {
       action = "replace";
@@ -74,8 +77,8 @@ function generateSimulatedDamageAssessment(): { damages: DamageItem[]; confidenc
     }
 
     const baseLaborCost = severity === "minor" ? 80 : severity === "moderate" ? 150 : 280;
-    const basePartsCost = action === "replace" 
-      ? (severity === "severe" ? 350 : 200) 
+    const basePartsCost = action === "replace"
+      ? (severity === "severe" ? 350 : 200)
       : (action === "paint" ? 100 : 50);
 
     const laborVariance = 0.8 + Math.random() * 0.4;
@@ -139,15 +142,19 @@ function generateMockVehicleInfo() {
 
 export async function registerRoutes(
   httpServer: Server,
-  app: Express
+  app: Express,
+  storage: IStorage = new MemStorage(),
 ): Promise<Server> {
+
+  const assessLimit = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: "draft-8", legacyHeaders: false, message: { error: "Too many assessments. Try again in a minute." } });
 
   app.get("/api/claims", async (req, res) => {
     try {
       const claims = await storage.getAllClaims();
-      // Include imageUrl for thumbnails in list view
+      // Full uploaded image payloads are returned only by the detail route.
       res.json(claims);
     } catch (error) {
+      if (error instanceof WorkflowError) return res.status(error.status).json({ error: error.message });
       res.status(500).json({ error: "Failed to fetch claims" });
     }
   });
@@ -161,19 +168,18 @@ export async function registerRoutes(
       }
       res.json(claim);
     } catch (error) {
+      if (error instanceof WorkflowError) return res.status(error.status).json({ error: error.message });
       res.status(500).json({ error: "Failed to fetch claim" });
     }
   });
 
-  app.post("/api/claims/assess", async (req, res) => {
+  app.post("/api/claims/assess", assessLimit, async (req, res) => {
     try {
-      const { imageData } = req.body;
-
-      if (!imageData) {
-        return res.status(400).json({ error: "Image data is required" });
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 300));
+      const parsed = assessmentRequestSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Provide a valid imageData field." });
+      let imageData: string;
+      try { imageData = await normalizeImage(parsed.data.imageData); }
+      catch (error) { return res.status(400).json({ error: (error as Error).message }); }
 
       const { damages, confidence } = generateSimulatedDamageAssessment();
       const vehicleInfo = generateMockVehicleInfo();
@@ -192,7 +198,7 @@ export async function registerRoutes(
 
       res.json(claim);
     } catch (error) {
-      console.error("Assessment error:", error);
+      if (error instanceof WorkflowError) return res.status(error.status).json({ error: error.message });
       res.status(500).json({ error: "Failed to process damage assessment" });
     }
   });
@@ -200,7 +206,9 @@ export async function registerRoutes(
   app.patch("/api/claims/:claimId/damage/:damageId", async (req, res) => {
     try {
       const { claimId, damageId } = req.params;
-      const updates = req.body;
+      const parsed = updateDamageItemSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Provide valid severity, action and non-negative costs; no other fields can be edited." });
+      const updates = parsed.data;
 
       const updatedDamage = await storage.updateDamageItem(claimId, damageId, updates);
 
@@ -210,18 +218,34 @@ export async function registerRoutes(
 
       res.json(updatedDamage);
     } catch (error) {
+      if (error instanceof WorkflowError) return res.status(error.status).json({ error: error.message });
       res.status(500).json({ error: "Failed to update damage item" });
+    }
+  });
+
+  app.patch("/api/claims/:id/notes", async (req, res) => {
+    const parsed = claimNotesSchema.required().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Notes must be text of at most 5000 characters." });
+    try {
+      const claim = await storage.updateClaim(req.params.id, { agentNotes: parsed.data.notes });
+      if (!claim) return res.status(404).json({ error: "Claim not found" });
+      res.json(claim);
+    } catch (error) {
+      if (error instanceof WorkflowError) return res.status(error.status).json({ error: error.message });
+      res.status(500).json({ error: "Failed to save notes" });
     }
   });
 
   app.post("/api/claims/:id/approve", async (req, res) => {
     try {
       const { id } = req.params;
-      const { notes } = req.body;
+      const parsed = claimNotesSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Notes must be text of at most 5000 characters." });
+      const { notes } = parsed.data;
 
       const updatedClaim = await storage.updateClaim(id, {
         status: "approved",
-        agentNotes: notes,
+        ...(notes !== undefined ? { agentNotes: notes } : {}),
       });
 
       if (!updatedClaim) {
@@ -230,6 +254,7 @@ export async function registerRoutes(
 
       res.json(updatedClaim);
     } catch (error) {
+      if (error instanceof WorkflowError) return res.status(error.status).json({ error: error.message });
       res.status(500).json({ error: "Failed to approve claim" });
     }
   });
@@ -237,11 +262,13 @@ export async function registerRoutes(
   app.post("/api/claims/:id/flag", async (req, res) => {
     try {
       const { id } = req.params;
-      const { notes } = req.body;
+      const parsed = claimNotesSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Notes must be text of at most 5000 characters." });
+      const { notes } = parsed.data;
 
       const updatedClaim = await storage.updateClaim(id, {
         status: "flagged",
-        agentNotes: notes,
+        ...(notes !== undefined ? { agentNotes: notes } : {}),
       });
 
       if (!updatedClaim) {
@@ -250,6 +277,7 @@ export async function registerRoutes(
 
       res.json(updatedClaim);
     } catch (error) {
+      if (error instanceof WorkflowError) return res.status(error.status).json({ error: error.message });
       res.status(500).json({ error: "Failed to flag claim" });
     }
   });
