@@ -129,7 +129,7 @@ function DamageItemRow({
       </div>
 
       {isEditing && (
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-4 xl:grid-cols-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Severity</label>
             <Select
