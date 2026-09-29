@@ -11,7 +11,7 @@ interface ConfidenceDisplayProps {
 export function ConfidenceDisplay({ confidence, showExplanation = true }: ConfidenceDisplayProps) {
   const isHighConfidence = confidence >= 85;
   const isMediumConfidence = confidence >= 70 && confidence < 85;
-  
+
   const getStatusColor = () => {
     if (isHighConfidence) return "text-green-600 dark:text-green-400";
     if (isMediumConfidence) return "text-yellow-600 dark:text-yellow-400";
@@ -38,26 +38,26 @@ export function ConfidenceDisplay({ confidence, showExplanation = true }: Confid
     return (
       <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
         <AlertTriangle className="h-3 w-3 mr-1" />
-        Manual Review Required
+        Manual Review Recommended
       </Badge>
     );
   };
 
   const getExplanation = () => {
     if (isHighConfidence) {
-      return "AI assessment meets confidence threshold. Ready for approval.";
+      return "Illustrative score only. Review the assessment before approval.";
     }
     if (isMediumConfidence) {
       return "Some uncertainty detected. Review flagged items before approval.";
     }
-    return "Low confidence score. Detailed manual review is required.";
+    return "Illustrative low score. Detailed manual review is recommended.";
   };
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold flex items-center justify-between gap-2 flex-wrap">
-          AI Confidence Score
+          Simulated Confidence Score
           {getStatusBadge()}
         </CardTitle>
       </CardHeader>
@@ -68,9 +68,9 @@ export function ConfidenceDisplay({ confidence, showExplanation = true }: Confid
           </span>
           <span className="text-2xl text-muted-foreground">%</span>
         </div>
-        
+
         <div className="mt-4 h-2 rounded-full bg-muted overflow-hidden">
-          <div 
+          <div
             className={cn(
               "h-full rounded-full transition-all duration-500",
               isHighConfidence && "bg-green-500",

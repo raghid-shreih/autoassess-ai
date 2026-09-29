@@ -1,5 +1,4 @@
-import { pgTable, text, integer, real, jsonb } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
+import { pgTable, text, real, jsonb } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 // Damage and severity enums
@@ -23,8 +22,8 @@ export const damageItemSchema = z.object({
   severity: z.enum(severityLevels),
   action: z.enum(repairActions),
   confidence: z.number().min(0).max(100),
-  laborCost: z.number(),
-  partsCost: z.number(),
+  laborCost: z.number().finite().min(0).max(1_000_000),
+  partsCost: z.number().finite().min(0).max(1_000_000),
   reasoning: z.string().optional(),
 });
 
@@ -70,20 +69,28 @@ export const claimSchema = z.object({
 
 export type Claim = z.infer<typeof claimSchema>;
 
-// List view returns claims without the imageUrl for performance
-export type ClaimSummary = Omit<Claim, 'imageUrl'>;
+// List summaries omit full upload data and detailed assessment/notes.
+export type ClaimSummary = Pick<Claim, "id" | "policyNumber" | "vehicleInfo" | "claimDate" | "status" | "overallConfidence" | "totalEstimate"> & { imageUrl?: string; damageCount: number };
 
-// Insert schema from Drizzle
-export const insertClaimSchema = createInsertSchema(claims).omit({ id: true });
+// Keep runtime validation independent of the optional persistence adapter.
+export const insertClaimSchema = claimSchema.omit({ id: true }).partial({
+  status: true, damages: true, overallConfidence: true, totalEstimate: true,
+});
 export type InsertClaim = z.infer<typeof insertClaimSchema>;
 
 export const assessmentRequestSchema = z.object({
-  imageData: z.string(),
-});
+  imageData: z.string().max(14_000_000),
+}).strict();
 
 export type AssessmentRequest = z.infer<typeof assessmentRequestSchema>;
 
-export const updateDamageItemSchema = damageItemSchema.partial().required({ id: true });
+export const updateDamageItemSchema = damageItemSchema.pick({
+  laborCost: true, partsCost: true, severity: true, action: true,
+}).partial().strict().refine(value => Object.keys(value).length > 0, "Provide at least one editable field");
+
+export const claimNotesSchema = z.object({
+  notes: z.string().max(5000).optional(),
+}).strict();
 export type UpdateDamageItem = z.infer<typeof updateDamageItemSchema>;
 
 // Placeholder for users (not used in this app)

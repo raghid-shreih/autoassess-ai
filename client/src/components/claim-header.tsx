@@ -27,6 +27,7 @@ export function ClaimHeader({ claim }: ClaimHeaderProps) {
           </div>
           <div>
             <h1 className="text-lg font-semibold tracking-tight">AutoAssess AI</h1>
+            <p className="text-xs text-muted-foreground">Simulated assessment demo</p>
           </div>
         </div>
       </div>
@@ -37,7 +38,7 @@ export function ClaimHeader({ claim }: ClaimHeaderProps) {
             <div className="hidden sm:flex items-center gap-2 text-sm">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">Claim #{claim.id.slice(0, 8)}</span>
-              <Badge size="sm" className={getStatusBadge(claim.status)}>
+              <Badge className={getStatusBadge(claim.status)}>
                 {claim.status.replace("_", " ")}
               </Badge>
             </div>

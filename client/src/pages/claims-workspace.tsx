@@ -16,14 +16,14 @@ import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Car, Clock, CheckCircle, AlertTriangle, FileText, Plus } from "lucide-react";
 import type { Claim, ClaimSummary, DamageItem } from "@shared/schema";
 
-function ClaimsList({ 
-  claims, 
-  isLoading, 
-  onSelectClaim 
-}: { 
-  claims: Claim[] | undefined; 
+function ClaimsList({
+  claims,
+  isLoading,
+  onSelectClaim
+}: {
+  claims: ClaimSummary[] | undefined;
   isLoading: boolean;
-  onSelectClaim: (claim: Claim) => void;
+  onSelectClaim: (claim: ClaimSummary) => void;
 }) {
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -105,7 +105,7 @@ function ClaimsList({
             const statusInfo = getStatusBadge(claim.status);
             const StatusIcon = statusInfo.icon;
             const claimDate = new Date(claim.claimDate);
-            
+
             return (
               <button
                 key={claim.id}
@@ -116,9 +116,9 @@ function ClaimsList({
                 <div className="flex items-center gap-4">
                   <div className="h-12 w-12 rounded bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                     {claim.imageUrl ? (
-                      <img 
-                        src={claim.imageUrl} 
-                        alt="Damage photo" 
+                      <img
+                        src={claim.imageUrl}
+                        alt="Damage photo"
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -141,7 +141,7 @@ function ClaimsList({
                 </div>
                 <div className="text-right shrink-0">
                   <div className="font-semibold">${claim.totalEstimate.toLocaleString()}</div>
-                  <div className="text-sm text-muted-foreground">{claim.damages?.length || 0} items</div>
+                  <div className="text-sm text-muted-foreground">{claim.damageCount} items</div>
                 </div>
               </button>
             );
@@ -185,24 +185,18 @@ function ClaimDetail({
   onUpdateDamage,
   onApprove,
   onFlag,
+  onSaveDraft,
   isProcessing,
 }: {
   claim: Claim;
   onBack: () => void;
-  onUpdateDamage: (id: string, updates: Partial<DamageItem>) => void;
-  onApprove: () => void;
-  onFlag: () => void;
+  onUpdateDamage: (id: string, updates: Partial<DamageItem>) => Promise<unknown>;
+  onApprove: (notes: string) => void;
+  onFlag: (notes: string) => void;
+  onSaveDraft: (notes: string) => void;
   isProcessing: boolean;
 }) {
   const [agentNotes, setAgentNotes] = useState(claim.agentNotes || "");
-  const { toast } = useToast();
-
-  const handleSaveDraft = () => {
-    toast({
-      title: "Draft Saved",
-      description: "Your progress has been saved.",
-    });
-  };
 
   const isCompleted = claim.status === "approved" || claim.status === "flagged";
 
@@ -238,16 +232,22 @@ function ClaimDetail({
         <div className="lg:col-span-2 space-y-6">
           <VehicleInfo claim={claim} />
           <ConfidenceDisplay confidence={claim.overallConfidence} />
-          <DamageAssessment 
+          <DamageAssessment
             damages={claim.damages || []}
             onUpdateDamage={isCompleted ? undefined : onUpdateDamage}
           />
           <CostEstimate damages={claim.damages || []} />
+          {isCompleted && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Agent Notes</CardTitle></CardHeader>
+              <CardContent><p className="whitespace-pre-wrap text-sm" data-testid="saved-agent-notes">{claim.agentNotes || "No notes recorded."}</p></CardContent>
+            </Card>
+          )}
           {!isCompleted && (
             <ActionPanel
-              onApprove={onApprove}
-              onFlag={onFlag}
-              onSaveDraft={handleSaveDraft}
+              onApprove={() => onApprove(agentNotes)}
+              onFlag={() => onFlag(agentNotes)}
+              onSaveDraft={() => onSaveDraft(agentNotes)}
               isProcessing={isProcessing}
               hasAssessment={true}
               notes={agentNotes}
@@ -265,7 +265,7 @@ export default function ClaimsWorkspace() {
   const queryClient = useQueryClient();
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
 
-  const { data: claims, isLoading: isLoadingClaims } = useQuery<Claim[]>({
+  const { data: claims, isLoading: isLoadingClaims } = useQuery<ClaimSummary[]>({
     queryKey: ["/api/claims"],
   });
 
@@ -285,7 +285,7 @@ export default function ClaimsWorkspace() {
       setSelectedClaimId(data.id);
       toast({
         title: "Assessment Complete",
-        description: "AI damage assessment has been generated successfully.",
+        description: "A simulated assessment has been generated. Results are illustrative.",
       });
     },
     onError: () => {
@@ -310,11 +310,12 @@ export default function ClaimsWorkspace() {
         description: "Your changes have been saved.",
       });
     },
+    onError: () => toast({ title: "Update failed", description: "Changes could not be saved. Refresh the claim and try again.", variant: "destructive" }),
   });
 
   const approveMutation = useMutation({
-    mutationFn: async (claimId: string) => {
-      const response = await apiRequest("POST", `/api/claims/${claimId}/approve`, {});
+    mutationFn: async ({ claimId, notes }: { claimId: string; notes: string }) => {
+      const response = await apiRequest("POST", `/api/claims/${claimId}/approve`, { notes });
       return await response.json() as Claim;
     },
     onSuccess: (data) => {
@@ -322,14 +323,15 @@ export default function ClaimsWorkspace() {
       queryClient.invalidateQueries({ queryKey: ["/api/claims", selectedClaimId] });
       toast({
         title: "Claim Approved",
-        description: "The estimate has been forwarded for final review.",
+        description: "The estimate is marked approved in this demo.",
       });
     },
+    onError: () => toast({ title: "Update failed", description: "Approval could not be saved. Refresh the claim and try again.", variant: "destructive" }),
   });
 
   const flagMutation = useMutation({
-    mutationFn: async (claimId: string) => {
-      const response = await apiRequest("POST", `/api/claims/${claimId}/flag`, {});
+    mutationFn: async ({ claimId, notes }: { claimId: string; notes: string }) => {
+      const response = await apiRequest("POST", `/api/claims/${claimId}/flag`, { notes });
       return await response.json() as Claim;
     },
     onSuccess: (data) => {
@@ -340,22 +342,35 @@ export default function ClaimsWorkspace() {
         description: "The claim has been flagged for manual review.",
       });
     },
+    onError: () => toast({ title: "Update failed", description: "Review request could not be saved. Refresh the claim and try again.", variant: "destructive" }),
+  });
+
+  const saveDraftMutation = useMutation({
+    mutationFn: async ({ claimId, notes }: { claimId: string; notes: string }) => {
+      const response = await apiRequest("PATCH", `/api/claims/${claimId}/notes`, { notes });
+      return await response.json() as Claim;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/claims"] });
+      toast({ title: "Draft Saved", description: "Notes saved for this demo session. Data resets on server restart." });
+    },
+    onError: () => toast({ title: "Save failed", description: "Notes could not be saved. Try again before leaving this claim.", variant: "destructive" }),
   });
 
   const handleImageUpload = (imageData: string) => {
     assessMutation.mutate(imageData);
   };
 
-  const handleUpdateDamage = (damageId: string, updates: Partial<DamageItem>) => {
+  const handleUpdateDamage = async (damageId: string, updates: Partial<DamageItem>) => {
     if (selectedClaim) {
-      updateDamageMutation.mutate({ claimId: selectedClaim.id, damageId, updates });
+      return updateDamageMutation.mutateAsync({ claimId: selectedClaim.id, damageId, updates });
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <ClaimHeader claim={selectedClaim} />
-      
+
       <main className="container mx-auto px-4 py-6 max-w-5xl">
         {selectedClaimId ? (
           isLoadingSelectedClaim || !selectedClaim ? (
@@ -367,12 +382,14 @@ export default function ClaimsWorkspace() {
             </div>
           ) : (
             <ClaimDetail
+              key={selectedClaim.id}
               claim={selectedClaim}
               onBack={() => setSelectedClaimId(null)}
               onUpdateDamage={handleUpdateDamage}
-              onApprove={() => approveMutation.mutate(selectedClaim.id)}
-              onFlag={() => flagMutation.mutate(selectedClaim.id)}
-              isProcessing={approveMutation.isPending || flagMutation.isPending}
+              onApprove={(notes) => approveMutation.mutate({ claimId: selectedClaim.id, notes })}
+              onFlag={(notes) => flagMutation.mutate({ claimId: selectedClaim.id, notes })}
+              onSaveDraft={(notes) => saveDraftMutation.mutate({ claimId: selectedClaim.id, notes })}
+              isProcessing={approveMutation.isPending || flagMutation.isPending || saveDraftMutation.isPending || updateDamageMutation.isPending}
             />
           )
         ) : (

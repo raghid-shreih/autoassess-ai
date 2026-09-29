@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 interface DamageAssessmentProps {
   damages: DamageItem[];
-  onUpdateDamage?: (id: string, updates: Partial<DamageItem>) => void;
+  onUpdateDamage?: (id: string, updates: Partial<DamageItem>) => Promise<unknown>;
 }
 
 const severityColors: Record<SeverityLevel, string> = {
@@ -20,12 +20,12 @@ const severityColors: Record<SeverityLevel, string> = {
   severe: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
-function DamageItemRow({ 
-  item, 
-  onUpdate 
-}: { 
-  item: DamageItem; 
-  onUpdate?: (updates: Partial<DamageItem>) => void;
+function DamageItemRow({
+  item,
+  onUpdate
+}: {
+  item: DamageItem;
+  onUpdate?: (updates: Partial<DamageItem>) => Promise<unknown>;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const canEdit = !!onUpdate;
@@ -40,9 +40,14 @@ function DamageItemRow({
   const isLowConfidence = item.confidence < 85;
   const totalCost = item.laborCost + item.partsCost;
 
-  const handleSave = () => {
-    onUpdate?.(editValues);
-    setIsEditing(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const validCosts = [editValues.partsCost, editValues.laborCost].every(value => Number.isFinite(value) && value >= 0 && value <= 1_000_000);
+  const handleSave = async () => {
+    if (!validCosts || isSaving) return;
+    setIsSaving(true);
+    try { await onUpdate?.(editValues); setIsEditing(false); }
+    catch { /* Parent mutation displays an error; retain edits for retry. */ }
+    finally { setIsSaving(false); }
   };
 
   const handleCancel = () => {
@@ -56,7 +61,7 @@ function DamageItemRow({
   };
 
   return (
-    <div 
+    <div
       className={cn(
         "rounded-lg border p-4",
         isLowConfidence && "border-yellow-300 dark:border-yellow-700 bg-yellow-50/50 dark:bg-yellow-900/10"
@@ -80,7 +85,7 @@ function DamageItemRow({
               </Badge>
             )}
           </div>
-          
+
           {!isEditing && (
             <div className="mt-2 text-sm text-muted-foreground">
               Action: <span className="capitalize font-medium text-foreground">{item.action}</span>
@@ -100,8 +105,8 @@ function DamageItemRow({
                 </div>
               </div>
               {canEdit && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   onClick={() => setIsEditing(true)}
                   data-testid={`button-edit-${item.id}`}
@@ -112,10 +117,10 @@ function DamageItemRow({
             </>
           ) : (
             <div className="flex gap-2">
-              <Button variant="ghost" size="icon" onClick={handleSave} data-testid={`button-save-${item.id}`}>
+              <Button variant="ghost" size="icon" onClick={handleSave} disabled={!validCosts || isSaving} data-testid={`button-save-${item.id}`}>
                 <Check className="h-4 w-4 text-green-600" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={handleCancel} data-testid={`button-cancel-${item.id}`}>
+              <Button variant="ghost" size="icon" onClick={handleCancel} disabled={isSaving} data-testid={`button-cancel-${item.id}`}>
                 <X className="h-4 w-4 text-red-600" />
               </Button>
             </div>
@@ -127,8 +132,8 @@ function DamageItemRow({
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Severity</label>
-            <Select 
-              value={editValues.severity} 
+            <Select
+              value={editValues.severity}
               onValueChange={(val) => setEditValues(prev => ({ ...prev, severity: val as SeverityLevel }))}
             >
               <SelectTrigger data-testid={`select-severity-${item.id}`}>
@@ -143,8 +148,8 @@ function DamageItemRow({
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Action</label>
-            <Select 
-              value={editValues.action} 
+            <Select
+              value={editValues.action}
               onValueChange={(val) => setEditValues(prev => ({ ...prev, action: val as RepairAction }))}
             >
               <SelectTrigger data-testid={`select-action-${item.id}`}>
@@ -160,8 +165,11 @@ function DamageItemRow({
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Parts Cost</label>
-            <Input 
+            <Input
               type="number"
+              min={0}
+              max={1000000}
+              step="any"
               value={editValues.partsCost}
               onChange={(e) => setEditValues(prev => ({ ...prev, partsCost: Number(e.target.value) }))}
               data-testid={`input-parts-cost-${item.id}`}
@@ -169,8 +177,11 @@ function DamageItemRow({
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">Labor Cost</label>
-            <Input 
+            <Input
               type="number"
+              min={0}
+              max={1000000}
+              step="any"
               value={editValues.laborCost}
               onChange={(e) => setEditValues(prev => ({ ...prev, laborCost: Number(e.target.value) }))}
               data-testid={`input-labor-cost-${item.id}`}
@@ -184,7 +195,7 @@ function DamageItemRow({
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="sm" className="mt-2 h-7 px-2 text-xs">
               {isExpanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
-              AI Reasoning
+              Simulated Reasoning
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -205,7 +216,7 @@ export function DamageAssessment({ damages, onUpdateDamage }: DamageAssessmentPr
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold flex items-center justify-between gap-2 flex-wrap">
-          Detected Damage
+          Simulated Damage Assessment
           <div className="flex items-center gap-2">
             {flaggedCount > 0 && (
               <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
@@ -220,9 +231,9 @@ export function DamageAssessment({ damages, onUpdateDamage }: DamageAssessmentPr
       <CardContent>
         <div className="space-y-3">
           {damages.map((item) => (
-            <DamageItemRow 
-              key={item.id} 
-              item={item} 
+            <DamageItemRow
+              key={item.id}
+              item={item}
               onUpdate={onUpdateDamage ? (updates) => onUpdateDamage(item.id, updates) : undefined}
             />
           ))}

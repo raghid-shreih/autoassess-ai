@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Upload, Image as ImageIcon, X, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -28,9 +29,10 @@ async function compressImage(file: File, maxDimension = 1280, quality = 0.7): Pr
     img.onload = () => {
       // Revoke object URL to free memory
       URL.revokeObjectURL(objectUrl);
-      
+
       let { width, height } = img;
-      
+      if (width * height > 16_000_000) { reject(new Error("Image exceeds 16 megapixels")); return; }
+
       // Scale down if larger than maxDimension
       if (width > maxDimension || height > maxDimension) {
         if (width > height) {
@@ -44,8 +46,9 @@ async function compressImage(file: File, maxDimension = 1280, quality = 0.7): Pr
 
       canvas.width = width;
       canvas.height = height;
-      ctx?.drawImage(img, 0, 0, width, height);
-      
+      if (!ctx) { reject(new Error("Canvas is unavailable")); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+
       // Convert to compressed JPEG
       const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
       resolve(compressedDataUrl);
@@ -60,43 +63,49 @@ async function compressImage(file: File, maxDimension = 1280, quality = 0.7): Pr
   });
 }
 
-export function ImageUpload({ 
-  onImageUpload, 
-  isProcessing = false, 
+export function ImageUpload({
+  onImageUpload,
+  isProcessing = false,
   currentImage,
-  onClear 
+  onClear
 }: ImageUploadProps) {
+  const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
-  }, []);
+  };
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-  }, []);
+  };
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith("image/")) {
+    if (file) {
       processFile(file);
     }
-  }, []);
+  };
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       processFile(file);
     }
-  }, []);
+  };
 
   const processFile = async (file: File) => {
+    if (isCompressing || isProcessing) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024) {
+      toast({ title: "Invalid upload", description: "Choose a JPG, PNG or WEBP image up to 10 MB and 16 megapixels.", variant: "destructive" });
+      return;
+    }
     setIsCompressing(true);
     try {
       // Compress image to reduce payload size (max 1280px, JPEG quality 0.7)
@@ -104,24 +113,17 @@ export function ImageUpload({
       setIsCompressing(false);
       onImageUpload(compressedDataUrl);
     } catch (error) {
-      console.error("Image compression failed:", error);
       setIsCompressing(false);
-      // Fallback to original file if compression fails
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        onImageUpload(result);
-      };
-      reader.readAsDataURL(file);
+      toast({ title: "Invalid image", description: "Choose a valid image up to 16 megapixels.", variant: "destructive" });
     }
   };
 
   if (currentImage) {
     return (
       <div className="relative w-full h-full min-h-96 rounded-lg overflow-hidden bg-muted">
-        <img 
-          src={currentImage} 
-          alt="Uploaded vehicle damage" 
+        <img
+          src={currentImage}
+          alt="Uploaded vehicle damage"
           className="w-full h-full object-contain"
           data-testid="img-uploaded-damage"
         />
@@ -141,7 +143,7 @@ export function ImageUpload({
             <div className="flex flex-col items-center gap-3">
               <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
               <span className="text-sm font-medium text-muted-foreground">
-                Analyzing damage...
+                Generating simulated assessment...
               </span>
             </div>
           </div>
@@ -155,8 +157,8 @@ export function ImageUpload({
       <div
         className={cn(
           "relative w-full min-h-96 rounded-lg border-2 border-dashed transition-colors duration-200",
-          isDragging 
-            ? "border-primary bg-primary/5" 
+          isDragging
+            ? "border-primary bg-primary/5"
             : "border-muted-foreground/25 hover:border-muted-foreground/50",
           "flex flex-col items-center justify-center gap-4 p-8"
         )}
@@ -168,7 +170,7 @@ export function ImageUpload({
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
           <ImageIcon className="h-8 w-8 text-muted-foreground" />
         </div>
-        
+
         <div className="text-center">
           <p className="text-base font-medium">
             Drop vehicle damage photo here
@@ -181,7 +183,8 @@ export function ImageUpload({
         <label>
           <input
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={isCompressing || isProcessing}
             className="sr-only"
             onChange={handleFileSelect}
             data-testid="input-file-upload"
@@ -195,7 +198,7 @@ export function ImageUpload({
         </label>
 
         <p className="text-xs text-muted-foreground">
-          Supports JPG, PNG, WEBP up to 10MB
+          JPG, PNG, WEBP · up to 10 MB and 16 megapixels
         </p>
       </div>
 
@@ -204,12 +207,12 @@ export function ImageUpload({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5 animate-pulse text-primary" />
-              {isCompressing ? "Preparing Image" : "Analyzing Damage"}
+              {isCompressing ? "Preparing Image" : "Simulating Assessment"}
             </DialogTitle>
             <DialogDescription>
-              {isCompressing 
-                ? "Optimizing image for upload..." 
-                : "AI is detecting and assessing vehicle damage..."}
+              {isCompressing
+                ? "Optimizing image for upload..."
+                : "Generating an illustrative assessment; this demo does not analyze damage from pixels."}
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center py-6">
